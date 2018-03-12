@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #!/usr/bin/python 
 # PYTHONUNBUFFERED=1
+
 """A simple GAN network and classifer.
 """
 # from __future__ import print_function
@@ -53,7 +54,8 @@ discriminator_entropy = tf.reduce_mean(tf.square(verdict_-verdict))
 # Create the generator model
 y0 = y_ # share tf.placeholder("float", [10],name="seed")
 Wg = tf.Variable(tf.zeros([10,input_width]),name='W_generator')
-xg=generated_x = tf.matmul(y0, Wg)
+#### xg=generated_x = tf.matmul(y0, Wg)
+generated_x = tf.matmul(y0, Wg)
 generator_entropy = tf.reduce_mean(tf.square(x-generated_x))
 
 #  evaluate and optimize the GAN's generator and discriminator
@@ -68,47 +70,52 @@ gan_step  = tf.train.AdamOptimizer(learning_rate=0.04).minimize(gan_entropy) # 0
 
 def play_pcm(data):
   print("play_pcm")
-  # f = wave.open(r"./test.wav", "rb")
+  ####
+  f = wave.open(r"./test.wav", "rb")
   audio = pyaudio.PyAudio()
-  # format=pyaudio.paFloat32
-  format=pyaudio.paInt8
+  format=pyaudio.paFloat32
+  # format=pyaudio.paInt8
+  ####
   # format=audio.get_format_from_width(f.getsampwidth())
+  ####
   # out_stream = audio.open( format=format,channels = f.getnchannels(), rate=f.getframerate(), output= True)
-  out_stream = audio.open( format=format,channels = 1, rate=48000, output= True)
+  # out_stream = audio.open(format=format,channels = 1, rate=48000, output= True)
+  out_stream = audio.open(format=format, channels=1, rate=8000, output=True)
   out_stream.start_stream()
   out_stream.write(data)
 
 
 # Train
 tf.global_variables_initializer().run()
-steps=3000#000
+steps=300#000
 batch=speech_data.wave_batch_generator(target=speech_data.Target.digits)
 negative=[0]*batch_size # input was fake
 positive=[1]*batch_size # input was real
-# print(next(batch))
+print(next(batch))
 err=0
 batch_xs, batch_ys = next(batch) #  keep constant for overfitting
 for i in range(steps):
-  # batch_xs, batch_ys = next(batch)
+  #### c
+  batch_xs, batch_ys = next(batch)
   # batch_xs1 = np.reshape(batch_xs,[batch_size,width*height])
   feed_dict={x: batch_xs, y_: batch_ys}
   _,loss=sess.run([train_step,cross_entropy],feed_dict) # classical classifier
-  # _,_,loss=sess.run([assign_batch,train_step,cross_entropy],feed_dict) # classical classifier
-  # feed_dict[verdict_]=positive # true examples
-  # _, _, verdict1 =sess.run([assign_batch,gan_step,verdict],feed_dict)
+  _,_,loss=sess.run([assign_batch,train_step,cross_entropy],feed_dict) # classical classifier
+  feed_dict[verdict_]=positive # true examples
+  _, _, verdict1 =sess.run([assign_batch,gan_step,verdict],feed_dict)
   #
-  # feed_dict[verdict_]=negative # generated samples
-  # sampled, _ , _, verdict0 =sess.run([generated_x,gan_step,gan_assign,verdict], feed_dict)
-  # sampled,_,_,loss=sess.run([generated_x,gan_step,gan_assign,gan_entropy],feed_dict) # gan classifier
+  feed_dict[verdict_]=negative # generated samples
+  #sampled, _ , _, verdict0 =sess.run([generated_x,gan_step,gan_assign,verdict], feed_dict)
+  sampled,_,_,loss=sess.run([generated_x,gan_step,gan_assign,gan_entropy],feed_dict) # gan classifier
   err+=loss
   if(i%20==0):
-    print "%d loss %f\r"%(i,err),
+    print ("%d loss %f\r"%(i,err),)
     sys.stdout.flush()
     # print("%d loss %f\r"%(i,err), end='')#,flush=True) WTF PY3 
     err=0
 
   if(i%250==1):
-    # play_pcm(sampled)
+    play_pcm(sampled)
     # check_accuracy()
     # Test trained model
     prediction=tf.argmax(y,1)
@@ -119,10 +126,12 @@ for i in range(steps):
     feed_dict={x: batch_xs, y_: batch_ys}
     best,p,a,verdict1= sess.run([prediction,probability,accuracy,verdict],feed_dict)
     # print(best,a,list(map(lambda x:round(x,3),p[0])))
-    print("\noveral accuracy %f"%a)
-
-
+    print("\n Overall accuracy %f"%a)
 
 print("FINAL TEST:")
-sampled = sess.run(generated_x,{y_: [[0,0,0,3,0,0,0,0,0,0]]*batch_size})  # generated samples
-play_pcm(sampled)
+sampled = sess.run(generated_x,{y_: [[0,0,1,0,0,0,0,0,0,0]]*batch_size})  # generated samples
+
+for i in range(len(batch_xs)):
+  play_pcm(np.array(batch_xs[i]))
+
+play_pcm(sampled[2])
